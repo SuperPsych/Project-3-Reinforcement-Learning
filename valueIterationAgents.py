@@ -60,8 +60,23 @@ class ValueIterationAgent(ValueEstimationAgent):
         self.runValueIteration()
 
     def runValueIteration(self):
-        # Write value iteration code here
-        "*** YOUR CODE HERE ***"
+        for _ in range(self.iterations):
+            newValues = util.Counter()
+            for s in self.mdp.getStates():
+                if self.mdp.isTerminal(s):
+                    newValues[s] = 0.0
+                    continue
+
+                actions = self.mdp.getPossibleActions(s)
+                if not actions:
+                    newValues[s] = 0.0
+                    continue
+                q_values = [
+                    self.computeQValueFromValues(s, a)
+                    for a in actions
+                ]
+                newValues[s] = max(q_values)
+            self.values = newValues
 
 
     def getValue(self, state):
@@ -76,8 +91,11 @@ class ValueIterationAgent(ValueEstimationAgent):
           Compute the Q-value of action in state from the
           value function stored in self.values.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        q = 0.0
+        for nextState, prob in self.mdp.getTransitionStatesAndProbs(state, action):
+            reward = self.mdp.getReward(state, action, nextState)
+            q += prob * (reward + self.discount * self.values[nextState])
+        return q
 
     def computeActionFromValues(self, state):
         """
@@ -88,8 +106,18 @@ class ValueIterationAgent(ValueEstimationAgent):
           there are no legal actions, which is the case at the
           terminal state, you should return None.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        if self.mdp.isTerminal(state):
+            return None
+
+        actions = self.mdp.getPossibleActions(state)
+        if not actions:
+            return None
+        best_action, best_q = None, float("-inf")
+        for a in actions:
+            q = self.computeQValueFromValues(state, a)
+            if q > best_q:
+                best_q, best_action = q, a
+        return best_action
 
     def getPolicy(self, state):
         return self.computeActionFromValues(state)
@@ -120,5 +148,48 @@ class PrioritizedSweepingValueIterationAgent(ValueIterationAgent):
         ValueIterationAgent.__init__(self, mdp, discount, iterations)
 
     def runValueIteration(self):
-        "*** YOUR CODE HERE ***"
+        mdp = self.mdp
+        gamma = self.discount
+        theta = self.theta
+
+        predecessors = {s: set() for s in mdp.getStates()}
+        for s in mdp.getStates():
+            if mdp.isTerminal(s):
+                continue
+            for a in mdp.getPossibleActions(s):
+                for ns, prob in mdp.getTransitionStatesAndProbs(s, a):
+                    if prob > 0:
+                        predecessors.setdefault(ns, set()).add(s)
+
+        pq = util.PriorityQueue()
+        for s in mdp.getStates():
+            if mdp.isTerminal(s):
+                continue
+            actions = mdp.getPossibleActions(s)
+            if not actions:
+                continue
+            maxQ = max(self.computeQValueFromValues(s, a) for a in actions)
+            diff = abs(self.values[s] - maxQ)
+            pq.update(s, -diff)
+
+        for _ in range(self.iterations):
+            if pq.isEmpty():
+                break
+            s = pq.pop()
+            if not mdp.isTerminal(s):
+                actions = mdp.getPossibleActions(s)
+                if actions:
+                    self.values[s] = max(self.computeQValueFromValues(s, a) for a in actions)
+                else:
+                    self.values[s] = 0.0
+            for p in predecessors.get(s, ()):
+                if mdp.isTerminal(p):
+                    continue
+                actions_p = mdp.getPossibleActions(p)
+                if not actions_p:
+                    continue
+                maxQ_p = max(self.computeQValueFromValues(p, a) for a in actions_p)
+                diff_p = abs(self.values[p] - maxQ_p)
+                if diff_p > theta:
+                    pq.update(p, -diff_p)
 
