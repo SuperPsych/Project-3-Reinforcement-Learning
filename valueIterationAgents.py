@@ -91,7 +91,7 @@ class ValueIterationAgent(ValueEstimationAgent):
           Compute the Q-value of action in state from the
           value function stored in self.values.
         """
-        q = 0.0
+        q = 0
         for nextState, prob in self.mdp.getTransitionStatesAndProbs(state, action):
             reward = self.mdp.getReward(state, action, nextState)
             q += prob * (reward + self.discount * self.values[nextState])
@@ -166,8 +166,6 @@ class PrioritizedSweepingValueIterationAgent(ValueIterationAgent):
             if mdp.isTerminal(s):
                 continue
             actions = mdp.getPossibleActions(s)
-            if not actions:
-                continue
             maxQ = max(self.computeQValueFromValues(s, a) for a in actions)
             diff = abs(self.values[s] - maxQ)
             pq.update(s, -diff)
